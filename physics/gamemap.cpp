@@ -115,29 +115,76 @@ bool	GameMap::RemoveEntity(
 	return true;
 }
 
+bool	GameMap::RespawnPlayer(
+		Entity*	PlyEnt)
+{
+	EntityType*		PlyTyp = NULL;
+	Entity*			defaultPlayer = NULL;
+	if (!PlyEnt->DataIntact())
+		return false;
+	PlyTyp = PlyEnt->Properties.Type;
+	if (PlyTyp->Properties.Type != "Player")
+		return false;
+//	Saving old properties.
+	std::string	origName = PlyEnt->Properties.Name;
+	double		origX = PlyEnt->Physics.PosX,
+				origY = PlyEnt->Physics.PosY;
+	int			origZ = PlyEnt->Properties.Layer;
+	long long	origGUID = PlyEnt->Properties.Guid;
+//	Finding the default player
+	for (auto itert : PlayerEntityList) {
+		Entity*	worker = itert.second;
+		if (!worker->DataIntact()) continue;
+		if (worker->Properties.Name == "__ZwDefaultEntity7Player") {
+			defaultPlayer = worker;
+			break;
+		}
+	}
+//	And if there's no default player?
+	if (!defaultPlayer->DataIntact())
+		return false;
+	if (!PlyEnt->DataIntact())
+		throw NullPointerException();
+	PlyEnt->InheritFrom(defaultPlayer);
+	PlyEnt->Properties.Name = origName;
+	PlyEnt->Properties.Guid = origGUID;
+	PlyEnt->Physics.PhysicsChanged = false;
+	PlyEnt->Physics.CollisionChanged = false;
+	PlyEnt->Physics.RenderDisabled = false;
+//	Processing smart re-insertion
+	double	newX = PlyEnt->Physics.PosX,
+			newY = PlyEnt->Physics.PosY;
+	int		newZ = PlyEnt->Properties.Layer;
+	PlyEnt->Physics.PosX = origX;
+	PlyEnt->Physics.PosY = origY;
+	PlyEnt->Properties.Layer = origZ;
+	InsertEntityPended(PlyEnt,
+			newZ, newX, newY);
+	return true;
+}
 Entity*	GameMap::CreatePlayer(
 		std::string	newName)
 {
 	EntityType*	undefPlayer = NULL;
 	Entity*		defaultPlayer = NULL;
-	Entity*		newPlayer = NULL;
-	for (auto itert : EntityList) {
+	Entity*		newPlayer = new Entity;
+//	To inherit from the default player if necessary
+	for (auto itert : PlayerEntityList) {
 		Entity*	worker = itert.second;
 		if (!worker->DataIntact()) continue;
 		if (worker->Properties.Name == "__ZwDefaultEntity7Player") {
 			defaultPlayer = worker;
-			newPlayer = new Entity;
 			newPlayer->InheritFrom(defaultPlayer);
 			break;
 		}
 	}
+//	But what if there's no default player?
 	if (defaultPlayer == NULL)
 	for (auto itert : EntityTypes) {
 		EntityType*	worker = itert.second;
 		if (!worker->DataIntact()) continue;
 		if (worker->Properties.Type == "Player") {
 			undefPlayer = worker;
-			newPlayer = new Entity;
 			newPlayer->InheritFrom(undefPlayer);
 			break;
 		}
@@ -145,7 +192,6 @@ Entity*	GameMap::CreatePlayer(
 	if (!newPlayer->DataIntact())
 		throw NullPointerException();
 	newPlayer->Properties.Name = newName;
-	newPlayer->Physics.PosX += newPlayer->Properties.Type->Physics.LengthX;
 	newPlayer->Physics.PhysicsChanged = false;
 	newPlayer->Physics.CollisionChanged = false;
 	newPlayer->Physics.RenderDisabled = false;
@@ -168,7 +214,7 @@ bool	GameMap::InsertEntityPended(
 			InsEnt->Properties.Guid = GenerateGuid();
 		} while (EntityList[InsEnt->Properties.Guid] != NULL);
 	}
-	PendInsertList[InsEnt] = InsPair;
+	PendInsertList[PendIndicator][InsEnt] = InsPair;
 	return true;
 }
 
@@ -213,12 +259,12 @@ bool	GameMap::InsertEntityPendedForce(
 {
 	if (!InsEnt->DataIntact())
 		return false;
-	PendInsertForceList.insert(InsEnt);
 	if (InsEnt->Properties.Guid == 0) {
 		do {
 			InsEnt->Properties.Guid = GenerateGuid();
 		} while (EntityList[InsEnt->Properties.Guid] != NULL);
 	}
+	PendInsertForceList[PendIndicator].insert(InsEnt);
 	return true;
 }
 
@@ -228,12 +274,15 @@ bool	GameMap::RemoveEntityPended(
 	if (!InsEnt->DataIntact())
 		return false;
 //	It's in these lists does not necessarily mean it's not in the chunks
-	if (PendInsertList.find(InsEnt) != PendInsertList.end())
-		PendInsertList.erase(InsEnt);
-	if (PendInsertForceList.find(InsEnt) != PendInsertForceList.find(InsEnt))
-		PendInsertForceList.erase(InsEnt);
-	if (PendRemoveList.find(InsEnt) == PendRemoveList.end())
-		PendRemoveList.insert(InsEnt);
+	if (PendInsertList[PendIndicator].find(InsEnt) !=
+			PendInsertList[PendIndicator].end())
+		PendInsertList[PendIndicator].erase(InsEnt);
+	if (PendInsertForceList[PendIndicator].find(InsEnt) !=
+			PendInsertForceList[PendIndicator].find(InsEnt))
+		PendInsertForceList[PendIndicator].erase(InsEnt);
+	if (PendRemoveList[PendIndicator].find(InsEnt) ==
+			PendRemoveList[PendIndicator].end())
+		PendRemoveList[PendIndicator].insert(InsEnt);
 	return true;
 }
 
@@ -241,7 +290,9 @@ bool	GameMap::CommitPendedChanges(
 		void)
 {
 //	Update insertions
-	for (auto itert : PendInsertList) {
+	bool	actInd = PendIndicator;
+	PendIndicator ^= 1;
+	for (auto itert : PendInsertList[actInd]) {
 		Entity*	InsEnt = itert.first;
 		if (!InsEnt->DataIntact()) continue;
 		triple_pair<int, double, double>	thsPair = itert.second;
@@ -259,21 +310,22 @@ bool	GameMap::CommitPendedChanges(
 		} else {
 			itert.first->Physics.PosX = thsPair.second;
 			itert.first->Physics.PosY = thsPair.third;
+			itert.first->Properties.Layer = thsPair.first;
 			InsertEntity(itert.first);
 		}
 	}
 //	Update force new insertions
-	for (auto itert : PendInsertForceList) {
+	for (auto itert : PendInsertForceList[actInd]) {
 		InsertEntity(itert);
 	}
 //	Update removals
-	for (Entity* itert : PendRemoveList) {
+	for (Entity* itert : PendRemoveList[actInd]) {
 		RemoveEntity(itert);
 		delete itert;
 	}
-	PendInsertList.clear();
-	PendInsertForceList.clear();
-	PendRemoveList.clear();
+	PendInsertList[actInd].clear();
+	PendInsertForceList[actInd].clear();
+	PendRemoveList[actInd].clear();
 	return true;
 }
 
@@ -288,6 +340,7 @@ bool	GameMap::ImportHeaderFromJson(
 	ImportJsonData(Description, Config["Description"]);
 	ImportJsonData(GravityConst, Config["GravityConst"]);
 	ImportJsonData(RegenerationValue, Config["RegenerationValue"]);
+	ImportJsonData(RespawnDelay, Config["RespawnDelay"]);
 	ImportJsonData(ModifyTime, Config["ModifyTime"]);
 //	Import world boundaries
 	ImportJsonData(WorldBoundary[0], Config["WorldBoundaryLeft"]);
@@ -383,6 +436,7 @@ bool	GameMap::ExportToJson(
 	Config.AddMember("Description", Description, JAlloc);
 	Config.AddMember("GravityConst", GravityConst, JAlloc);
 	Config.AddMember("RegenerationValue", RegenerationValue, JAlloc);
+	Config.AddMember("RespawnDelay", RespawnDelay, JAlloc);
 	ModifyTime = GetSystemTime();
 	Config.AddMember("ModifyTime", ModifyTime, JAlloc);
 //	Generating world boundary configuration
@@ -542,9 +596,12 @@ bool	GameMap::ResetEntityPositions(
 bool	GameMap::Clear(
 		void)
 {
-	PendInsertForceList.clear();
-	PendInsertList.clear();
-	PendRemoveList.clear();
+	PendInsertForceList[0].clear();
+	PendInsertForceList[1].clear();
+	PendInsertList[0].clear();
+	PendInsertList[1].clear();
+	PendRemoveList[0].clear();
+	PendRemoveList[1].clear();
 	std::vector<Entity*>	ErsWrkr;
 	for (auto itert : EntityList)
 		ErsWrkr.push_back(itert.second);
@@ -569,14 +626,20 @@ bool	GameMap::Clear(
 GameMap::GameMap(
 		void)
 {
-	PendInsertForceList.clear();
-	PendInsertList.clear();
-	PendRemoveList.clear();
+	PendInsertForceList[0].clear();
+	PendInsertForceList[1].clear();
+	PendInsertList[0].clear();
+	PendInsertList[1].clear();
+	PendRemoveList[0].clear();
+	PendRemoveList[1].clear();
+	PendIndicator = true;
 	IsHost = false;
 	LevelPath = "";
 	Name = "Untitled";
 	Description = "";
 	GravityConst = 9.8;
+	RegenerationValue = 1.0;
+	RespawnDelay = 1048576.0;
 //	Set world boundaries to a reasonable value
 	WorldBoundary[0] = -32767;
 	WorldBoundary[1] = 32767;

@@ -63,11 +63,15 @@ bool	PhEngine::RenderPhysicsFrame(
 		double	lcB, rcB, ucB, dcB; // Boundaries of CollideObject (introduced later)
 		bool	GravityReversed = ObjType->Physics.Mass < 0;
 		bool	hasCollidedBottom = false;
-		int		nobjChunk; // Chunk position
+		int		objChunk, nobjChunk; // Chunk position
 		double	obj_move_dist_sqr = 0.0, cobj_dist_sqr = 0.0;
-		vY -= GravityReversed ? ObjType->Physics.Mass * dT : g * dT;
+//		A specialty on calculating gravity interaction
+		if (GravityReversed)
+			vY -= ObjType->Physics.Mass * dT;
+		else
+			vY -= ObjType->Physics.Mass > 0 ? g * dT : 0.0;
 //		If this object has been marked to ignore simulation, we follow its deeds
-		if (!Object->PhysicsEnabled() || !Object->CollisionEnabled()) continue;
+		if (!Object->PhysicsEnabled()) continue;
 //		Calculate the move distance of the object
 		obj_move_dist_sqr = (vX * vX + vY * vY) * dT * dT;
 //		Pre-process potentially colliding objects in pended rendering chunks. All
@@ -79,6 +83,7 @@ bool	PhEngine::RenderPhysicsFrame(
 			MainMap->ChunkList[*PRChunkItertB]->QueryAdjacentEntities(Object, 2.0, PendCollision);
 		for (auto ItertCollideObject = PendCollision.begin(); ItertCollideObject != PendCollision.end(); ItertCollideObject++) {
 #else
+		if (Object->CollisionEnabled())
 		for (int PRChunkItertB : {PRChunkItertA - 1, PRChunkItertA, PRChunkItertA + 1})
 		for (auto ItertCollideObject : (MainMap->ChunkList[PRChunkItertB])->EntityList) {
 #endif
@@ -263,6 +268,7 @@ bool	PhEngine::RenderPhysicsFrame(
 					trig->ProcessConsequence(std::vector<void*>({
 						(void*)MainMap, (void*)CollideObject}));
 		}
+		objChunk = GetEntityChunkNum(sX);
 		sX += vX * dT, sY += vY * dT;
 		if (Object->Properties.Type->Properties.Type == "Player") {
 			PlayerEntity*	Confs = (PlayerEntity*)Object->Physics.ExtendedTags;
@@ -273,7 +279,7 @@ bool	PhEngine::RenderPhysicsFrame(
 		}
 //		Simulate air friction
 		vX *= 0.991;
-		vY *= 0.997;
+		vY *= 0.998;
 //		Red-black tree defect: must re-insert after updating related values
 //		Also, the position update is strictly related to the red-black-tree
 //		structure, therefore must be pended for later batch process.
@@ -289,7 +295,12 @@ bool	PhEngine::RenderPhysicsFrame(
 //		Re-inserting into new chunk (might not have changed...)
 		nobjChunk = GetEntityChunkNum(sX);
 		MainMap->CreateChunk(nobjChunk);
-		MainMap->InsertEntityPended(Object, sX, sY);
+		if (nobjChunk != objChunk)
+			MainMap->InsertEntityPended(Object, sX, sY);
+		else {
+			Object->Physics.PosX = sX;
+			Object->Physics.PosY = sY;
+		}
 	}
 	return true;
 }

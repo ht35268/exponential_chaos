@@ -19,6 +19,7 @@
 //	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <iomanip>
+#include <stack>
 
 #include "network/netsync.h"
 #include "graphics/render_private.h"
@@ -62,12 +63,12 @@ namespace graphicsRenderInventoryInternals
 //			to insert into the inventory.
 			PlayerExt->InventoryFocus = 1;
 			PlayerExt->Inventory.insert(PlayerExt->Inventory.begin(),
-					std::make_pair(EntTyp, 64));
+					make_triple_pair(EntTyp, 0, 64));
 			while (PlayerExt->Inventory.size() > 9)
 				PlayerExt->Inventory.erase(--PlayerExt->Inventory.end());
 		} else {
 			auto	itert = PlayerExt->Inventory.begin();
-			auto	inspair = std::make_pair(EntTyp, 1);
+			auto	inspair = make_triple_pair(EntTyp, 0, 1);
 			for (; itert != PlayerExt->Inventory.end(); itert++)
 				if (itert->first == EntTyp)
 					break;
@@ -132,7 +133,7 @@ namespace graphicsRenderInventoryInternals
 				ItemPics[i].SetProperties(
 					lBegin + (i % 9) * 72, lBegin + (i % 9 + 1) * 72 - 8,
 					uBegin - (i / 9) * 72, uBegin - (i / 9 + 1) * 72 + 8,
-					itert->second->Graphics.TextureOnHand);
+					itert->second->Graphics[PlayerEnt->Properties.TypeState].TextureOnHand);
 #ifdef RENDER_GMOVL_DISPLAY_ITEM_DESCRIPTION_
 				ItemDesc[i].SetContent(fontDesc);
 #endif
@@ -155,7 +156,7 @@ namespace graphicsRenderInventoryInternals
 				ItemPics[i].SetProperties(
 					lBegin + (i % 9) * 72, lBegin + (i % 9 + 1) * 72 - 8,
 					uBegin - (i / 9) * 72, uBegin - (i / 9 + 1) * 72 + 8,
-					PlayerExt->Inventory[cntBegin + i].first->Graphics.TextureOnHand);
+					PlayerExt->Inventory[cntBegin + i].first->Graphics[PlayerEnt->Properties.TypeState].TextureOnHand);
 #ifdef RENDER_GMOVL_DISPLAY_ITEM_DESCRIPTION_
 				ItemDesc[i].SetContent(fontDesc);
 #endif
@@ -187,7 +188,17 @@ bool	graphicsRenderChatMsg(
 					-GameConfig.WindowWidth / 2 + 20, -GameConfig.WindowHeight / 2 + 64 + (i + 1) * 28,
 					0.251, 0.349, 0.596, 20, ANSI_CHARSET, "OCR A Std");
 	std::vector<std::string>	Vec;
+	std::stack<std::string>		VecStk;
 	chatRetrieveMessageList(Vec);
+//	Reverse sequence...
+	for (auto str : Vec)
+		VecStk.push(str);
+	Vec.clear();
+	while (!VecStk.empty()) {
+		auto	str = VecStk.top();
+		VecStk.pop();
+		Vec.push_back(str);
+	}
 	for (int i = 0; i < 6; i++) Vec.push_back("");
 //	Setting font content
 	for (int i = 0; i < 6; i++)
@@ -331,17 +342,17 @@ bool	graphicsRenderInventory(
 	PendTooltips.clear();
 //	Some other things we need to take care about
 	if ((kGetKeyOnpress('A') ||
-			kGetKeyOnpress('W') ||
-			kGetKeyOnpress(VK_UP) ||
-			kGetKeyOnpress(VK_LEFT))
+			kGetKeyOnpress(KNUM_PGUP) ||
+			InputControl.WheelUp)
 			&& CurPage > 0) {
 		CurPage--;
+		InputControl.WheelUp = false;
 		PostUpdateInventoryView();
 	} else if (kGetKeyOnpress('D') ||
-			kGetKeyOnpress('S') ||
-			kGetKeyOnpress(VK_DOWN) ||
-			kGetKeyOnpress(VK_RIGHT)) {
+			kGetKeyOnpress(KNUM_PGDN) ||
+			InputControl.WheelDn) {
 		CurPage++;
+		InputControl.WheelDn = false;
 		PostUpdateInventoryView();
 	}
 	return true;
@@ -400,7 +411,7 @@ bool	graphicsRenderGameOverlay(
 	for (int i = 0; i < hotBarItems; i++)
 		objHotbarItems[i].SetProperties(
 			-288 + i * 64 + 8, -224 + i * 64 - 8, hotBarTop - 8, hotBarBot + 8,
-			PlayerExt->Inventory[i].first->Graphics.TextureOnHand);
+			PlayerExt->Inventory[i].first->Graphics[PlayerEnt->Properties.TypeState].TextureOnHand);
 	static	GuiFont		fontItemCount[9];
 	if (RequireUpdate)
 		for (int i = 0; i < 9; i++)
@@ -427,7 +438,7 @@ bool	graphicsRenderGameOverlay(
 		std::stringstream	Stream;
 		std::string			WorkStr;
 		int					CurCount;
-		CurCount = PlayerExt->Inventory[i].second;
+		CurCount = PlayerExt->Inventory[i].third;
 		if (CurCount > 999 || PlayerExt->IsCreative)
 			Stream << "INF";
 		else

@@ -55,7 +55,8 @@ bool	Entity::CollisionEnabled(void)
 	{ return CollisionEnabled(NULL); }
 
 bool	Entity::RenderEnabled(void)
-	{ return Properties.Type->Graphics.RenderEnabled && (!Physics.RenderDisabled); }
+	{ return Properties.Type->Graphics[Properties.TypeState].RenderEnabled
+			&& (!Physics.RenderDisabled); }
 
 bool	Entity::DataIntact(void)
 {
@@ -66,6 +67,11 @@ bool	Entity::DataIntact(void)
 //	Check entity type data intactness
 	if (!EntTyp->DataIntact())
 		return false;
+	if (Properties.TypeState < 0)
+		return false;
+	if (Properties.TypeState >= (int)EntTyp->Graphics.size())
+		return false;
+//	Checking type-specific properties' intactness
 	TypeName = EntTyp->Properties.Name;
 	if (TypeName == "Player") {
 		PlayerEntity*	EntExt = (PlayerEntity*)Physics.ExtendedTags;
@@ -81,6 +87,7 @@ bool	Entity::InheritFrom(
 		return false;
 	Properties.Type = EntTyp;
 	Properties.TypeName = EntTyp->Properties.Name;
+	Properties.TypeState = 0;
 	Properties.GenTime = GetProcessTimeUnsynced();
 	Properties.Name = "";
 	Properties.Owner = "";
@@ -106,6 +113,7 @@ bool	Entity::InheritFrom(
 {
 	Properties.Type = OtherEnt->Properties.Type;
 	Properties.TypeName = Properties.Type->Properties.Name;
+	Properties.TypeState = OtherEnt->Properties.TypeState;
 	Properties.Guid = 0;
 	Properties.Layer = OtherEnt->Properties.Layer;
 	Properties.GenTime = GetProcessTime();
@@ -147,6 +155,7 @@ bool	Entity::ImportFromJson(
 	if (!InheritFrom(Properties.Type))
 		return false;
 //	Specify data from JSON values
+	ImportJsonData(Properties.TypeState, Config["Properties"]["TypeState"]);
 	ImportJsonData(Properties.Layer, Config["Properties"]["Layer"]);
 	ImportJsonData(Properties.Name, Config["Properties"]["Name"]);
 	ImportJsonData(Physics.PhysicsChanged, Config["Physics"]["PhysicsChanged"]);
@@ -173,8 +182,6 @@ bool	Entity::ImportFromJson(
 			Physics.TriggerList.push_back(Worker);
 		}
 	}
-//	Cleanup something that hadn't been defined
-	Physics.VelX = Physics.VelY = 0.0;
 //	Building extended tags for specific items
 	if (Properties.Type->Properties.Type == "Player") {
 		PlayerEntity*	Confs = new PlayerEntity;
@@ -183,16 +190,18 @@ bool	Entity::ImportFromJson(
 		if (Config["Physics"]["ExtendedTags"]["Inventory"].IsArray()) {
 			std::string TypeName;
 			int			TypeSize;
+			int			TypeState;
 			EntityType*	TypePntr;
 			for (unsigned int i = 0; i < Config["Physics"]["ExtendedTags"]["Inventory"].Size(); i++) {
 				if (!Config["Physics"]["ExtendedTags"]["Inventory"][i].IsObject())
 					continue;
 				ImportJsonData(TypeName, Config["Physics"]["ExtendedTags"]["Inventory"][i]["Type"]);
+				ImportJsonData(TypeState, Config["Physics"]["ExtendedTags"]["Inventory"][i]["State"]);
 				ImportJsonData(TypeSize, Config["Physics"]["ExtendedTags"]["Inventory"][i]["Count"]);
 				TypePntr = EntityTypes[TypeName];
 				if (!TypePntr || TypeSize <= 0)
 					continue;
-				Confs->Inventory.push_back(std::make_pair(TypePntr, TypeSize));
+				Confs->Inventory.push_back(make_triple_pair(TypePntr, TypeState, TypeSize));
 			}
 		}
 		ImportJsonData(Confs->InventoryFocus, Config["Physics"]["ExtendedTags"]["InventoryFocus"]);
@@ -213,6 +222,7 @@ bool	Entity::ExportToJson(
 	Config.AddMember("Properties", rapidjson::Value(rapidjson::kObjectType), CAlloc);
 	Config.AddMember("Physics", rapidjson::Value(rapidjson::kObjectType), CAlloc);
 	Config["Properties"].AddMember("TypeName", Properties.TypeName, CAlloc);
+	Config["Properties"].AddMember("TypeState", Properties.TypeState, CAlloc);
 	Config["Properties"].AddMember("Layer", Properties.Layer, CAlloc);
 	Config["Properties"].AddMember("Name", Properties.Name, CAlloc);
 	Config["Physics"].AddMember("PhysicsChanged", Physics.PhysicsChanged, CAlloc);
@@ -250,7 +260,8 @@ bool	Entity::ExportToJson(
 				rapidjson::Value	invItem;
 				invItem.SetObject();
 				invItem.AddMember("Type", Confs->Inventory[i].first->Properties.Name, CAlloc);
-				invItem.AddMember("Count", Confs->Inventory[i].second, CAlloc);
+				invItem.AddMember("State", Confs->Inventory[i].second, CAlloc);
+				invItem.AddMember("Count", Confs->Inventory[i].third, CAlloc);
 				Config["Physics"]["ExtendedTags"]["Inventory"].PushBack(invItem.Move(), CAlloc);
 			}
 		}
@@ -265,6 +276,7 @@ Entity::Entity(void)
 {
 	Properties.Type = NULL;
 	Properties.TypeName = "";
+	Properties.TypeState = 0;
 	Properties.Guid = 0;
 	Properties.Layer = 0;
 	Properties.GenTime = 0;
@@ -276,7 +288,7 @@ Entity::Entity(void)
 	Physics.PosX = 0.0;
 	Physics.PosY = 0.0;
 	Physics.VelX = 0.0;
-	Physics.VelX = 0.0;
+	Physics.VelY = 0.0;
 	Physics.TriggerList.clear();
 	Physics.ExtendedTags = NULL;
 	return ;
@@ -322,40 +334,4 @@ PlayerEntity::PlayerEntity(
 	IsCreative = false;
 	Inventory.clear();
 	return ;
-}
-
-std::ostream&	operator << (
-		std::ostream&	Stream,
-		Entity*			OutEnt)
-{
-	class_table_head(Stream);
-	class_table_body(Stream, "Debug object", "Entity");
-	void*	ActualAddress = (void*)OutEnt;
-	void*	TypeAddress = NULL;
-	if (!OutEnt->DataIntact()) {
-		class_table_body(Stream, "Memory address (unreadable)", ActualAddress);
-		goto ProcessEnd;
-	}
-	TypeAddress = (void*)OutEnt->Properties.Type;
-	class_table_body(Stream, "Memory address", ActualAddress);
-	class_table_body(Stream, "Properties.Type", TypeAddress);
-	class_table_body(Stream, "Properties.TypeName", OutEnt->Properties.TypeName);
-	class_table_body(Stream, "Properties.Guid", OutEnt->Properties.Guid);
-	class_table_body(Stream, "Properties.Layer", OutEnt->Properties.Layer);
-	class_table_body(Stream, "Properties.GenTime", OutEnt->Properties.GenTime);
-	class_table_body(Stream, "Properties.Name", OutEnt->Properties.Name);
-	class_table_body(Stream, "Properties.Owner", OutEnt->Properties.Owner);
-	class_table_body(Stream, "Physics.PosX", OutEnt->Physics.PosX);
-	class_table_body(Stream, "Physics.PosY", OutEnt->Physics.PosY);
-	class_table_body(Stream, "Physics.VelX", OutEnt->Physics.VelX);
-	class_table_body(Stream, "Physics.VelY", OutEnt->Physics.VelY);
-	if (OutEnt->Properties.Type->Properties.Type == "Player") {
-		PlayerEntity*	OutExt = (PlayerEntity*)OutEnt->Physics.ExtendedTags;
-		class_table_body(Stream, " (Player).Life", OutExt->Life);
-		class_table_body(Stream, " (Player).InventoryFocus", OutExt->InventoryFocus);
-		class_table_body(Stream, " (Player).IsCreative", OutExt->IsCreative);
-	}
-ProcessEnd:
-	class_table_end(Stream);
-	return Stream;
 }

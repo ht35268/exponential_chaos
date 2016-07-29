@@ -100,7 +100,7 @@ std::string	NetmgrGetEntityLifeStr(
 	std::stringstream	Stream;
 	std::string			Result;
 	Stream << std::fixed << std::setprecision(8)
-		   << "LIF " << OutEnt->Properties.Guid << ((PlayerEntity*)
+		   << "LIF " << OutEnt->Properties.Guid << " " << ((PlayerEntity*)
 			(OutEnt->Physics.ExtendedTags))->Life;
 	getline(Stream, Result);
 	return Result;
@@ -109,12 +109,14 @@ std::string	NetmgrGetEntityLifeStr(
 //	Network protocol definition
 //	NUL 0 (This message does nothing at all!)
 //	DON	0 (Tell newly joined clients that chunks have been loaded)
+//	RLD 0 (Sent by clients, requiring entire chunk reload)
 //	TIM 1678.635469 (Broadcast server time, server only)
 //	REM 123456789012 (Remove entity)
 //	MOV 123456789012 7 0.5456 0.879878 1.051 1.999 (Set position, velocity)
 //	DEF 123456789012 {"Data":{...JSON...}} (Define entity data)
 //	HED {...JSON...} (Define map headers, used only once)
 //	LIF 123456789012 168.36 (Define player life)
+//	RES 123456789012 (Resurrect player)
 //	MSG	Hello, world (Broadcast a chat message)
 
 void	NetmgrInThread(
@@ -147,13 +149,20 @@ void	NetmgrInThread(
 			if (OpType == "DON") {
 //				Flush chunk data, in one time
 				if (MainMap->IsHost) continue; // Which should not have happened
+				if (!MainMap->ModifyTime) continue; // That means it's not completely loaded.
 #ifdef NETWORK_NETSYNC_DELETE_UNSYNCED_ENTITIES_
 				for (auto itert : MainMap->EntityList) {
 					if (EntBuffer.find(itert.second) == EntBuffer.end())
 						MainMap->RemoveEntityPended(itert.second);
 				}
 #endif
+				MsgLock.lock();
+				MsgQueue.push("NUL 0");
+				MsgLock.unlock();
 				break;
+			} else if (OpType == "RLD") {
+//				A crucial part in multi-part communication.
+				flagDatRequireBroadcast = true;
 			} else if (OpType == "TIM") {
 				std::stringstream	Stream;
 				Stream << OpCmd; Stream >> SvrTimeAhead;
@@ -167,10 +176,8 @@ void	NetmgrInThread(
 				if (RdGuid == 0) continue;
 				RmEnt = MainMap->EntityList[RdGuid];
 //				If the entity already existed, then we shall remove it
-				if (RmEnt->DataIntact()) {
-					if (RmEnt->Properties.Type->Properties.Type != "Projectile")
-						MainMap->RemoveEntityPended(RmEnt);
-				}
+				if (RmEnt->DataIntact())
+					MainMap->RemoveEntityPended(RmEnt);
 			} else if (OpType == "MOV") {
 				std::stringstream	Stream;
 				Stream << OpCmd;
@@ -237,6 +244,18 @@ void	NetmgrInThread(
 					continue;
 				PlayerEntity*		PlyExt = (PlayerEntity*)PlyEnt->Physics.ExtendedTags;
 				PlyExt->Life = RdLife;
+			} else if (OpType == "RES") {
+				std::stringstream	Stream;
+				long long			RdGuid;
+				Entity*				PlyEnt = NULL;
+				Stream << OpCmd;
+				Stream >> RdGuid;
+				if (RdGuid == 0) continue;
+				PlyEnt = MainMap->EntityList[RdGuid];
+				if (!PlyEnt->DataIntact() || PlyEnt->Properties.
+						Type->Properties.Type != "Player")
+					continue;
+				MainMap->RespawnPlayer(PlyEnt);
 			} else if (OpType == "MSG") {
 				chatInsertMessage(OpCmd);
 			}
@@ -263,6 +282,14 @@ void	NetmgrOutThread(
 	flagDatRequireBroadcast = false;
 	flagLastPlayerMsgTime.clear();
 	std::string	Output;
+//	Call on the server to initialize the chunks
+	if (MgrState == Client) {
+		std::string	Sender = "RLD 0";
+		MsgLock.lock();
+		for (int i = 0; i < 10; i++)
+			MsgQueue.push(Sender);
+		MsgLock.unlock();
+	}
 	while (MainSock->Connected()) {
 		SleepForTime(valSleepTime);
 		Output.clear();
@@ -480,8 +507,6 @@ bool	NetmgrRemoveEntity(
 {
 	std::stringstream	Stream;
 	std::string			Str;
-	if (RmEnt->Properties.Type->Properties.Type == "Projectile")
-		return true;
 	Stream << "REM " << RmEnt->Properties.Guid;
 	getline(Stream, Str);
 	MsgLock.lock();
@@ -500,20 +525,33 @@ bool	NetmgrMoveEntity(
 	return true;
 }
 
-bool	NetmgrPostMessage(
-		std::string	Msg)
+bool	NetmgrSetEntityLife(
+		Entity*	SetEnt)
 {
-	std::string	Str = "MSG " + Msg;
+	std::string	Str = NetmgrGetEntityLifeStr(SetEnt);
 	MsgLock.lock();
 	MsgQueue.push(Str);
 	MsgLock.unlock();
 	return true;
 }
 
-bool	NetmgrSetEntityLife(
+bool	NetmgrRespawnEntity(
 		Entity*	SetEnt)
 {
-	std::string	Str = NetmgrGetEntityLifeStr(SetEnt);
+	std::stringstream	Stream;
+	std::string			Str;
+	Stream << "RES " << SetEnt->Properties.Guid;
+	getline(Stream, Str);
+	MsgLock.lock();
+	MsgQueue.push(Str);
+	MsgLock.unlock();
+	return true;
+}
+
+bool	NetmgrPostMessage(
+		std::string	Msg)
+{
+	std::string	Str = "MSG " + Msg;
 	MsgLock.lock();
 	MsgQueue.push(Str);
 	MsgLock.unlock();

@@ -67,13 +67,16 @@ public:
 	class typeGraphics
 	{
 	public:
+		typeGraphics();
 		bool	RenderEnabled;
+		int		TexRotation; // Texture rotation
 		double	AnimationInterval; // Time interval of each repetition
 		double	Luminosity;
 		double	LengthX, LengthY; // Length as displayed on screen
 		std::vector<GLuint>	TextureList; // Animated textures
 		GLuint				TextureOnHand; // Texture on the hotbar
-	} Graphics;
+	};
+	std::vector<typeGraphics>	Graphics;
 //	Informative functions
 	/**
 	 *  @brief  check data intactness
@@ -146,15 +149,5 @@ public:
 //	Constructors and destruction operators
 	ParticleEntityType(void);
 };
-
-//	Debugging and other uses
-/**
- *  @brief  stream operators for entity types
- *  This simplify the output of entity types, for better reading of entity types
- *  in debugging mode.
- */
-std::ostream&	operator << (
-		std::ostream&	Stream,
-		EntityType*		OutTyp);
 
 #endif /* PHYSICS_ENTITYTYPE_H_ */

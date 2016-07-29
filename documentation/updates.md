@@ -1,7 +1,102 @@
 
 # Version History
 
-## 0.12.x Community Update
+### 0.12.8 | 29/07/16
+ * Stable release.
+
+### 0.12.7.52 | 29/07/16
+ * Fixed copying blocks with WorldEdit does not work.
+ * Made some minor changes to the inventory scrolling scheme.
+
+### 0.12.7.51 | 29/07/16
+ * Added native logging support.
+
+### 0.12.7.49 | 29/07/16
+ * Fixed all moving entities sticking at the bottom of the map if program is not
+   run in GDB (a safe place where bugs would be omitted).
+ * Updated resources for Windows release.
+
+### 0.12.7.47 | 29/07/16
+ * Updated documentations and manuals. This documentation update included all the
+   changes (those which have not been documented) since version `0.12.1`.
+
+### 0.12.7.45 | 28/07/16
+ * Fixed server not accepting more clients if one of them disconnected for a
+   considerably short time.
+ * Multi player mode is now **completely** playable.
+
+### 0.12.7.43 | 28/07/16
+ * Fixed respawn time irregularity.
+ * Fixed clients would respawn immediately or never regardless of the time limit.
+ * Fixed blowing up things wouldn't cause clients to receive inventory expansion.
+ * Fixed switching inventory with mouse wheels wouldn't cause other clients or
+   servers to notice the change of it's handheld items.
+ * Fixed clients' health points not / never synchronizing.
+ * Reversed chat message display orientation / sequence.
+
+### 0.12.7.26 | 28/07/16
+ * Added respawn support for players in both single player and multiplayer. The
+   time limit can be defined in the map description.
+ * Fixed default player could be dealt damage in projectile deployments.
+ * Fixed template player's life gaining even if it shouldn't.
+ * Fixed SIGSEGV when summoning projectiles in multiplayer, which is a flow which
+   did not check the entity intactness when iterating the map.
+ * Fixed dis-synchronization between server and clients.
+ * Fixed deployed projectiles would not detonate in clients.
+ * Fixed projectiles detonating twice in both server and clients.
+
+### 0.12.6.61 | 27/07/16
+ * Optimized physics renderer for a greatly improved performance. This disables
+   the necessity to re-insert an entity even after its position has a small and
+   humble change. Now merely the chunk update requires re-insertion.
+ * Optimized WorldEdit for a greatly improved performance. This requires the
+   entity scanner to discover only entities in the given chunks and given layers
+   instead of the entire world map. Practically this would improve performance
+   greatly, however frequent the editor is used.
+ * Added timestamps in pended operations. This can directly solve the bug that
+   entities could never be inserted if imposed by triggers in the meantime the
+   PendOperation function is working.
+ * Fixed sometimes ender pearls don't detonate / teleport the players.
+ * Fixed no animation ever appearing from fire charges. (A direct consequence
+   from another bug fixed this version update)
+ * Fixed WorldEdit copies could overlap. This is fixed by adding a limit.
+ * Fixed particles never disappearing.
+
+### 0.12.6.42 | 26/07/16
+ * Added rendering for item on hand. If the player is himself holding this item,
+   the item would be shown as the entity actually to be placed on the ground.
+   Otherwise it would be the displayed item.
+ * Completed projectile definitions for `Minecraft2D`.
+ * Changed 'scroll with key F' to 'scroll with key Ctrl'.
+ * Fixed physics enabled objects but collision enabled objects being stationary.
+ * Fixed entities marked as non-interactive with gravity interfered with gravity.
+ * Recoloured leaves and finished the texture pack.
+
+### 0.12.6.37 | 26/07/16
+ * When mining entities, if one wasn't in the inventory before, it would
+   create a new slot in the inventory which wouldn't in the previous versions.
+ * Re-updated inventory structure to contain entity block type states.
+ * Added texture mirroring support for entities. This is integrated into the
+   `TexRotation` property by adding 4 to the value.
+ * Added block state switching support for both creative and survival mode.
+   However, the 'scroll with key F' method would be soon deprecated in the near
+   future in favour of other methods.
+ * Fixed different slots of same items would be incremented if destroyed by
+   projectiles deployed by this very player.
+ * Fixed items could be injected as entities into the world.
+ * Fixed texture rotation could not be loaded.
+
+### 0.12.6.22 | 26/07/16
+ * Entity graphics supports rotation for now.
+ * Updated a pack of textures and entities in `Minecraft2D` to comply to certain
+   changes in the entity type JSON format.
+ * Fixed low-definition textures blurry in inventory.
+
+### 0.12.6.7 | 25/07/16
+ * Updated the entity type JSON format to allow more than one block state per
+   entity type. This can be used to solve the overflowing of the creative
+   inventory and multi-directional block.
+ * Low-definition textures don't look blurry now.
 
 ### 0.12.5.36 | 25/07/16
  * Mouse wheels now usable to manipulate the inventory focus.

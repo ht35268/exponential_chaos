@@ -37,9 +37,9 @@ public:
 };
 ```
 
-Therefore there are two strings, ```PreliminaryAction``` and ```ConsequentialAction```,
+Therefore there are two strings, `PreliminaryAction` and `ConsequentialAction`,
 each representing the name of the invoked function. The two array of strings,
-which are ```PreliminaryObject``` and ```ConsequentialObject```, represent the
+which are `PreliminaryObject` and `ConsequentialObject`, represent the
 arguments of the actions.
 
 ### Preliminary Actions
@@ -59,18 +59,18 @@ arguments of the actions.
 ### Consequential Actions
 
  * CreateEntity (1 argument)
-    * Argument 1 : String, name of ```EntityType```. Will be created right here.
+    * Argument 1 : String, name of `EntityType`. Will be created right here.
 
  * CreateEntity (3 arguments)
-    * Argument 1 : String, name of ```EntityType```.
-    * Argument 2 : Number, ```Physics.PosX```.
-    * Argument 3 : Number, ```Physics.PosY```.
+    * Argument 1 : String, name of `EntityType`.
+    * Argument 2 : Number, `Physics.PosX`.
+    * Argument 3 : Number, `Physics.PosY`.
 
  * DeductPlayerLife
     * Argument 1 : Number, the life deducted every phase.
     * Argument 2 : String, name of player:
-       * ```__ZwTrigger7All``` for all players
-       * ```__ZwTrigger7Nearest``` for nearest player
+       * `__ZwTrigger7All` for all players
+       * `__ZwTrigger7Nearest` for nearest player
        * Otherwise the name of the player
 
  * DeployProjectile
@@ -81,8 +81,8 @@ arguments of the actions.
 
  * TeleportEntity (2 arguments)
     * Teleports the owner to the **specified** destination.
-    * Argument 1 : Number, ```Physics.PosX```.
-    * Argument 2 : Number, ```Physics.PosY```.
+    * Argument 1 : Number, `Physics.PosX`.
+    * Argument 2 : Number, `Physics.PosY`.
 
  * WorldEdit.Fill.Pick (no argument)
     * Takes no arguments, the block in this area would be considered the block to

@@ -94,16 +94,16 @@ crowd-based map creations and PvP events.
 
 ## Todo List
 
+ - [ ] Support crafting recipes.
  - [ ] Add key mapping for users to customize.
  - [ ] Typeset fonts without the reliability on native APIs.
  - [ ] Remove all platform-dependent functions to move to Linux.
- - [x] Fix multiplayer mode inaccessible on different computers.
 
 ## Special Thanks
 
 | Contributor    | Reason                                                                                           |
 | :------------- | :----------------------------------------------------------------------------------------------- |
-| **RDFZ/yjy**   | Well-known coach in *Informatics in Olympiad*, who led me to the world of coding.                |
+| **RDFZ/yjy**   | The honourable creator of the Sieve of Tsienyi Lawyer.                                           |
 | RDFZ/zsyzzsoft | For inspiring me of creating this game from his games ```Game01``` and ```Gravity Hazard```.     |
 | RDFZ/SkyWalker | For supporting me continuously of this project and providing first-hand test results.            |
 | RDFZ/BurstZero | For providing extensive support on algorithms in developing the network engine.                  |

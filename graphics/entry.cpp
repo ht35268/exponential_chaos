@@ -31,8 +31,13 @@ void graphicsInit(void)
 //	Enable 2D textures
 	glEnable(GL_TEXTURE_2D);
 //	Alpha textures are enabled
+//	Thanks to http://stackoverflow.com
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+//	After doing this, textures wouldn't look blurry even if it's small
+//	Thanks to http://stackoverflow.com (again)
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 //	Using Cartesian system
 	glMatrixMode(GL_PROJECTION);
 //	Miscellaneous
@@ -67,5 +72,6 @@ bool graphicsEntry(int &argc, char** argv)
 	glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE, GLUT_ACTION_GLUTMAINLOOP_RETURNS);
 //	All done, finished initialisation
 	graphicsInit();
+	eclogPost(1, "Done setting graphics properties");
 	return true;
 }

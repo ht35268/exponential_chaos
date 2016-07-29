@@ -77,7 +77,8 @@ bool	PhEngine::UpdateProjectileDeployment(
 			std::string	SentPlyrNam = Object->Properties.Owner;
 			Entity*		SentPlyrEnt = NULL;
 			for (auto itert : MainMap->PlayerEntityList)
-				if (itert.second->Properties.Name == SentPlyrNam) {
+				if (itert.second->DataIntact() &&
+						itert.second->Properties.Name == SentPlyrNam) {
 					SentPlyrEnt = itert.second;
 					break;
 				}
@@ -116,12 +117,17 @@ bool	PhEngine::UpdateProjectileDeployment(
 								distCombine) / ProjTyp->DeployRadius * distY / distCombine * 0.1;
 					}
 //					But in any case it should have a blast resistance checker.
+//					As in multiplayer, one projectile need not and should not be deployed
+//					twice or many times depending on the joined players. Therefore we
+//					strictly affirm that such restrictions must be made so that one
+//					removal simulations are only done on the server.
 					if (Victim->Properties.Type->Physics.BlastResistance < ProjTyp->DeployPowerBlast *
 							(ProjTyp->DeployRadius - distCombine) / ProjTyp->DeployRadius &&
 							Victim->Properties.Type->Properties.Type != "Player" &&
 							Victim->Properties.Type->Properties.Type != "Particle") {
 //						Inventory of the set player should be filled with this item
 						if (SentPlyrEnt->DataIntact()) {
+							bool			SentPlyrAdded = false;
 							PlayerEntity*	SentPlyrExt = (PlayerEntity*)SentPlyrEnt->Physics.ExtendedTags;
 							for (auto itert_pair = SentPlyrExt->Inventory.begin();
 									itert_pair != SentPlyrExt->Inventory.end();
@@ -129,24 +135,38 @@ bool	PhEngine::UpdateProjectileDeployment(
 								EntityType*	EntTyp = itert_pair->first;
 								if (!EntTyp->DataIntact()) continue;
 								if (EntTyp != Victim->Properties.Type) continue;
-								itert_pair->second++;
+								itert_pair->third++;
+								SentPlyrAdded = true;
+								break;
+							}
+							if (!SentPlyrAdded) {
+								EntityType*	EntTyp = Victim->Properties.Type;
+								SentPlyrExt->Inventory.push_back(make_triple_pair(EntTyp, 0, 1));
 							}
 						}
 //						Now to pend the removal of this entity
-						MainMap->RemoveEntityPended(Victim);
-						NetmgrRemoveEntity(Victim);
+						if (MainMap->IsHost) {
+							MainMap->RemoveEntityPended(Victim);
+							NetmgrRemoveEntity(Victim);
+						}
 					}
 //					And in some particular cases it would make sure that if, the victims
 //					were players, it would certainly deduct life from the players
 					if (Victim->Properties.Type->Properties.Type == "Player") {
 						PlayerEntity*	VicEnt = (PlayerEntity*)Victim->Physics.ExtendedTags;
 						if (!VicEnt) throw NullPointerException();
-						if (!VicEnt->IsCreative)
+						if (!VicEnt->IsCreative && Victim->Properties.Name != "__ZwDefaultEntity7Player") {
 							VicEnt->Life -= ProjTyp->DeployPowerDamage * (ProjTyp->DeployRadius -
 								distCombine) / ProjTyp->DeployRadius;
+							if (Object->Properties.Owner == GameConfig.PlayerName)
+								if (MainMap->IsHost)
+									NetmgrSetEntityLife(Victim);
+						}
 					}
 				}
 			}
+//			Hither does not need only server simulations. This is to keep the
+//			area clean and tidy - no muss, no fuss.
 			MainMap->RemoveEntityPended(Object);
 			NetmgrRemoveEntity(Object);
 			continue;

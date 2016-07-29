@@ -1,7 +1,7 @@
 
-//	"inputctrl.h" -*- C++ -*-
-//	Created on: 11 April 2016
-//	Input devices' main indexer.
+//	"log.h" -*- C++ -*-
+//	Created on: 29 July 2016
+//	Game debug logger
 //
 //	Copyright (C) 2016  Geoffrey Tang.
 //
@@ -18,27 +18,36 @@
 //	You should have received a copy of the GNU General Public License
 //	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#ifndef NATIVE_INPUTCTRL_H_
-#define NATIVE_INPUTCTRL_H_
+#ifndef DEBUG_LOG_H_
+#define DEBUG_LOG_H_
 
 #include "include/public.h"
 
-class InputCtrlType
-{
-public:
-	int			MouseX, MouseY, MouseEntry;
-	bool		LDown, MDown, RDown, WheelUp, WheelDn;
-	long long	PlayerGuid;
-	double		CameraX, CameraY;
-	InputCtrlType(void)
-	{
-		MouseX = MouseY = MouseEntry = 0;
-		LDown = MDown = RDown = false;
-		WheelUp = WheelDn = false;
-		PlayerGuid = 0;
-		CameraX = CameraY = 0.0;
-		return ;
-	}
-};
+#include <iostream>
+#include <sstream>
 
-#endif /* NATIVE_INPUTCTRL_H_ */
+template <typename _T>
+std::string	eclogToString(
+		_T __x)
+{
+	std::stringstream	__z;
+	std::string			__y;
+	__z << __x;
+	getline(__z, __y);
+	return __y;
+}
+
+bool	eclogThreadStart(
+		void);
+
+bool	eclogThreadEnd(
+		void);
+
+bool	eclogSetVerbosity(
+		int	LogLevel);
+
+bool	eclogPost(
+		int			LogLevel,
+		std::string	Content);
+
+#endif /* DEBUG_LOG_H_ */
